@@ -9,6 +9,7 @@ import { WebhookController } from './webhook.controller';
 import { WebhookDispatchProcessor } from './webhook-dispatch.processor';
 import { WebhookEventListener } from './webhook-event.listener';
 import { QUEUE_WEBHOOK_DISPATCH } from './webhook-queue.constants';
+import { WEBHOOK_MAX_ATTEMPTS } from './webhook.service';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
@@ -20,7 +21,7 @@ import { AuthModule } from '../auth/auth.module';
     BullModule.registerQueue({
       name: QUEUE_WEBHOOK_DISPATCH,
       defaultJobOptions: {
-        attempts: 5,
+        attempts: WEBHOOK_MAX_ATTEMPTS,
         backoff: { type: 'exponential', delay: 1000 },
         removeOnComplete: { age: 60 * 60 * 24 },
         removeOnFail: false,

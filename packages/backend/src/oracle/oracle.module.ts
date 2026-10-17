@@ -18,6 +18,10 @@ import { OracleHealthService } from './oracle-health.service';
 import { OracleHealthController } from './oracle-health.controller';
 import { IpfsService } from '../storage/ipfs.service';
 import { Token } from '../token/entities/token.entity';
+import {
+  CrossChainOracleRelayService,
+  Eip712Verifier,
+} from './cross-chain-relay.service';
 
 @Module({
   imports: [
@@ -41,6 +45,8 @@ import { Token } from '../token/entities/token.entity';
     CoinGeckoService,
     PriceDeviationService,
     PriceDeviationWorker,
+    Eip712Verifier,
+    CrossChainOracleRelayService,
     {
       provide: SorobanRpc.Server,
       useFactory: () => {
@@ -55,6 +61,7 @@ import { Token } from '../token/entities/token.entity';
     PriceDeviationService,
     OracleHealthService,
     CoinGeckoService,
+    CrossChainOracleRelayService,
   ],
 })
 export class OracleModule {}

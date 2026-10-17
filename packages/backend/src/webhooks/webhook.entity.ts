@@ -36,6 +36,19 @@ export class WebhookSubscription {
   @Column({ default: true })
   isActive: boolean;
 
+  /**
+   * Number of consecutive delivery failures. Reset to 0 on the first
+   * successful delivery and used to auto-disable dead endpoints.
+   */
+  @Column({ type: 'int', default: 0 })
+  consecutiveFailures?: number;
+
+  @Column({ type: 'timestamp', nullable: true })
+  disabledAt?: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  disabledReason?: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

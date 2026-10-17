@@ -22,6 +22,15 @@ import {
 } from './webhook.dto';
 import { QUEUE_WEBHOOK_DISPATCH } from './webhook-queue.constants';
 
+/**
+ * Number of consecutive failed deliveries after which a webhook endpoint is
+ * automatically disabled. Bounds the blast radius of permanently dead URLs.
+ */
+export const WEBHOOK_AUTO_DISABLE_THRESHOLD = 50;
+
+/** Total BullMQ attempts = 1 initial delivery + 3 exponential retries. */
+export const WEBHOOK_MAX_ATTEMPTS = 4;
+
 export interface DispatchWebhookJob {
   subscriptionId: string;
   event: WebhookEventType;
@@ -179,6 +188,49 @@ export class WebhookService {
       attempt,
     });
     await this.logRepo.save(log);
+
+    // Maintain the consecutive-failure counter and auto-disable dead endpoints.
+    // Never let a health-tracking failure break delivery bookkeeping.
+    await this.recordDeliveryOutcome(subscriptionId, success).catch(
+      () => undefined,
+    );
+  }
+
+  /**
+   * Track consecutive delivery failures for a subscription and disable it once
+   * {@link WEBHOOK_AUTO_DISABLE_THRESHOLD} failures are reached. A single
+   * success resets the counter.
+   */
+  async recordDeliveryOutcome(
+    subscriptionId: string,
+    success: boolean,
+  ): Promise<void> {
+    const sub = await this.subRepo.findOne({ where: { id: subscriptionId } });
+    if (!sub) return;
+
+    if (success) {
+      if ((sub.consecutiveFailures ?? 0) !== 0) {
+        sub.consecutiveFailures = 0;
+        await this.subRepo.save(sub);
+      }
+      return;
+    }
+
+    sub.consecutiveFailures = (sub.consecutiveFailures ?? 0) + 1;
+
+    if (
+      sub.consecutiveFailures >= WEBHOOK_AUTO_DISABLE_THRESHOLD &&
+      sub.isActive
+    ) {
+      sub.isActive = false;
+      sub.disabledAt = new Date();
+      sub.disabledReason = `Auto-disabled after ${sub.consecutiveFailures} consecutive delivery failures`;
+      this.logger.warn(
+        `Webhook subscription ${subscriptionId} auto-disabled after ${sub.consecutiveFailures} consecutive failures`,
+      );
+    }
+
+    await this.subRepo.save(sub);
   }
 
   async getDeliveryLogs(
